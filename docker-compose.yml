@@ -7,11 +7,10 @@ services:
     # image: chalna:local
     ports:
       - "7861:7861"
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - { driver: nvidia, count: all, capabilities: [gpu] }
+    runtime: nvidia
+    environment:
+      NVIDIA_VISIBLE_DEVICES: all
+      NVIDIA_DRIVER_CAPABILITIES: compute,utility
     # chalna serves API + WebUI on :7861 (see external/chalna/README.md)
 
   jeoneum:
@@ -24,16 +23,14 @@ services:
       CHALNA_URL: "http://chalna:7861"
       JEONEUM_RESULTS_DIR: "/data/results"
       HF_HOME: "/models/huggingface"
+      NVIDIA_VISIBLE_DEVICES: all
+      NVIDIA_DRIVER_CAPABILITIES: compute,utility
+    runtime: nvidia
     volumes:
       - ./results:/data/results
       - jeoneum-models:/models
     ports:
       - "7870:7870"
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - { driver: nvidia, count: all, capabilities: [gpu] }
 
 volumes:
   # HF weights persist across restarts so they are not re-downloaded.
