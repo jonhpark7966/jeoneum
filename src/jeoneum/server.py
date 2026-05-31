@@ -92,6 +92,7 @@ class Job(BaseModel):
     stage: Optional[str] = None
     error: Optional[str] = None
     outputs: dict[str, dict] = Field(default_factory=dict)
+    source_subtitle: Optional[str] = None        # URL of the source-language transcript SRT
     # Internal (excluded from API responses):
     workdir: str = ""
     source_path: str = ""                      # uploaded file path OR url
@@ -114,9 +115,14 @@ class JobResponse(BaseModel):
     source_name: str
     error: Optional[str] = None
     outputs: dict[str, dict] = Field(default_factory=dict)
+    source_subtitle: Optional[str] = None
+    duration_seconds: Optional[float] = None     # wall-clock for started->completed
 
 
 def _job_response(job: "Job") -> JobResponse:
+    duration = None
+    if job.started_at and job.completed_at:
+        duration = (job.completed_at - job.started_at).total_seconds()
     return JobResponse(
         job_id=job.job_id,
         status=job.status,
@@ -128,6 +134,8 @@ def _job_response(job: "Job") -> JobResponse:
         source_name=job.source_name,
         error=job.error,
         outputs=job.outputs,
+        source_subtitle=job.source_subtitle,
+        duration_seconds=duration,
     )
 
 
@@ -279,6 +287,26 @@ async def get_result(job_id: str, lang: str):
     )
 
 
+@app.get("/jobs/{job_id}/subtitle/{key}")
+async def get_subtitle(job_id: str, key: str):
+    """Download a subtitle: key='source' for the transcript, or a target language."""
+    job = _jobs.get(job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail="Job not found")
+    if job.status != "done":
+        raise HTTPException(status_code=404, detail="Result not available")
+
+    out_dir = RESULTS_DIR / job_id / "out"
+    if key == "source":
+        path, name = out_dir / "transcript.srt", "transcript.srt"
+    else:
+        path, name = out_dir / f"dub_{key}.srt", f"dub_{key}.srt"
+    if not path.exists():
+        raise HTTPException(status_code=404, detail="Subtitle file missing")
+
+    return FileResponse(str(path), media_type="application/x-subrip", filename=name)
+
+
 # =============================================================================
 # Worker
 # =============================================================================
@@ -290,7 +318,10 @@ def _run_job(job_id: str) -> None:
 
     job.status = "running"
     job.started_at = datetime.utcnow()
-    job.stage = "dubbing"
+    job.stage = "starting"
+
+    def _progress(stage: str) -> None:
+        job.stage = stage
 
     try:
         manual_voices = None
@@ -317,6 +348,7 @@ def _run_job(job_id: str) -> None:
             max_speedup=job.max_speedup,
             duck=job.duck,
             duck_db=job.duck_db,
+            progress=_progress,
         )
     except Exception as e:
         job.status = "error"
@@ -326,15 +358,19 @@ def _run_job(job_id: str) -> None:
         traceback.print_exc()
         return
 
-    # Record outputs
+    # Record outputs (dub wav + translated subtitle per language)
+    out_dir = Path(job.workdir) / "out"
     job.outputs = {
         lang: {
             "lang": lang,
             "result_url": f"/jobs/{job_id}/result/{lang}",
+            "srt_url": f"/jobs/{job_id}/subtitle/{lang}",
             "filename": Path(p).name,
         }
         for lang, p in outputs.items()
     }
+    if (out_dir / "transcript.srt").exists():
+        job.source_subtitle = f"/jobs/{job_id}/subtitle/source"
     job.status = "done"
     job.completed_at = datetime.utcnow()
     job.stage = None

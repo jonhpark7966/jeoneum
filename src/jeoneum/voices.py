@@ -10,6 +10,7 @@ A reference clip may carry its transcript in a sidecar `.txt` of the same basena
 """
 from __future__ import annotations
 
+import subprocess
 from pathlib import Path
 
 from .schema import Doc, Voice
@@ -26,18 +27,39 @@ def _resolve_ref_text(voice: Voice) -> str | None:
     return None
 
 
-def extract_ref(vocals_path: str, doc: Doc, speaker_id: str) -> tuple[str, str | None]:
-    """Pick the longest clean (non-overlapping) span for speaker_id and cut a ref clip.
-    Returns (ref_audio_path, ref_text|None)."""
-    raise NotImplementedError("auto ref extraction is deferred (diarization work)")
+def extract_ref(
+    audio_path: str, doc: Doc, speaker_id: str, workdir: str, max_sec: float = 10.0
+) -> tuple[str, str | None]:
+    """Cut a reference clip for speaker_id from `audio_path` (the separated vocals
+    stem when available). Picks the speaker's longest segment as a clean-ish sample
+    and returns (ref_audio_path, ref_text). The ref text is the source-language
+    transcript of that segment — cross-lingual cloning handles the target language."""
+    segs = [s for s in doc.segments if s.speaker_id == speaker_id and s.end_time > s.start_time]
+    if not segs:
+        raise ValueError(f"no segments to extract a reference for speaker {speaker_id!r}")
+    best = max(segs, key=lambda s: s.end_time - s.start_time)
+    start = best.start_time
+    duration = min(best.end_time - start, max_sec)
+    Path(workdir).mkdir(parents=True, exist_ok=True)
+    out = str(Path(workdir) / f"ref_{speaker_id}.wav")
+    subprocess.run(
+        ["ffmpeg", "-y", "-loglevel", "error", "-ss", str(start), "-i", audio_path,
+         "-t", str(duration), "-ac", "1", "-ar", "24000", out],
+        check=True,
+    )
+    return out, best.text
 
 
 def resolve_voices(
-    doc: Doc, engine: TTSEngine, manual: dict[str, Voice] | None = None
+    doc: Doc,
+    engine: TTSEngine,
+    manual: dict[str, Voice] | None = None,
+    workdir: str | None = None,
 ) -> dict[str, VoiceHandle]:
-    """Build a VoiceHandle per speaker_id (manual override wins; a single manual
-    voice covers all speakers). Reference prompts are cached so each distinct voice
-    is built once."""
+    """Build a VoiceHandle per speaker_id. Manual override wins; a single manual
+    voice covers all speakers; otherwise auto-extract a reference per speaker from
+    the separated vocals stem (cross-lingual clone). Prompts are cached so each
+    distinct voice is built once."""
     manual = manual or {}
     cache: dict[tuple, VoiceHandle] = {}
 
@@ -59,8 +81,13 @@ def resolve_voices(
         elif default is not None:
             handles[sp] = default
         elif doc.vocals_audio:
-            ref_audio, ref_text = extract_ref(doc.vocals_audio, doc, sp)
-            handles[sp] = engine.build_voice(ref_audio, ref_text)
+            ref_audio, ref_text = extract_ref(
+                doc.vocals_audio, doc, sp, workdir or str(Path(doc.vocals_audio).parent / "refs")
+            )
+            cache_key = (ref_audio, ref_text)
+            if cache_key not in cache:
+                cache[cache_key] = engine.build_voice(ref_audio, ref_text)
+            handles[sp] = cache[cache_key]
         else:
             raise ValueError(
                 f"no voice for speaker {sp!r}: provide a manual voice "

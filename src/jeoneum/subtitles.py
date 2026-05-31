@@ -60,6 +60,33 @@ def _segments_from_json(data: dict) -> list[Segment]:
     ]
 
 
+def _sec_to_ts(t: float) -> str:
+    if t < 0:
+        t = 0.0
+    h = int(t // 3600)
+    m = int((t % 3600) // 60)
+    s = int(t % 60)
+    ms = int(round((t - int(t)) * 1000))
+    if ms == 1000:  # rounding spillover
+        s += 1
+        ms = 0
+    return f"{h:02d}:{m:02d}:{s:02d},{ms:03d}"
+
+
+def write_srt(segments: list, path: str, text_for) -> str:
+    """Write segments to an SRT file. `text_for(segment)` returns the cue text
+    (skip the cue if it returns empty)."""
+    blocks, idx = [], 1
+    for seg in segments:
+        txt = (text_for(seg) or "").strip()
+        if not txt:
+            continue
+        blocks.append(f"{idx}\n{_sec_to_ts(seg.start_time)} --> {_sec_to_ts(seg.end_time)}\n{txt}\n")
+        idx += 1
+    Path(path).write_text("\n".join(blocks), encoding="utf-8")
+    return path
+
+
 def load_subtitle_doc(path: str) -> Doc:
     """Parse an SRT/JSON subtitle file into a Doc (no audio; duration = last cue end)."""
     p = Path(path)

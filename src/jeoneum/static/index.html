@@ -425,6 +425,13 @@ a.download:hover { opacity: 0.9; }
   </div>
 </div>
 
+<div class="container" style="margin-top:16px">
+  <div class="panel" style="flex:1 1 100%; width:100%">
+    <h2>작업 모니터 <span id="jobs-count" style="font-size:0.8rem; color:var(--text-dim)"></span></h2>
+    <div id="jobs-list"><div class="status-idle">아직 제출된 작업이 없습니다.</div></div>
+  </div>
+</div>
+
 <script>
 (function() {
   'use strict';
@@ -684,13 +691,24 @@ a.download:hover { opacity: 0.9; }
       const code = document.createElement('span');
       code.className = 'lang-code';
       code.textContent = o.lang || lang;
-      const dl = document.createElement('a');
-      dl.className = 'download';
-      dl.href = o.result_url;
-      dl.setAttribute('download', '');
-      dl.textContent = '다운로드';
+      const links = document.createElement('span');
+      const dlAudio = document.createElement('a');
+      dlAudio.className = 'download';
+      dlAudio.href = o.result_url;
+      dlAudio.setAttribute('download', '');
+      dlAudio.textContent = '음성';
+      links.appendChild(dlAudio);
+      if (o.srt_url) {
+        const dlSrt = document.createElement('a');
+        dlSrt.className = 'download';
+        dlSrt.href = o.srt_url;
+        dlSrt.setAttribute('download', '');
+        dlSrt.textContent = '자막';
+        dlSrt.style.marginLeft = '8px';
+        links.appendChild(dlSrt);
+      }
       row.appendChild(code);
-      row.appendChild(dl);
+      row.appendChild(links);
 
       const audio = document.createElement('audio');
       audio.controls = true;
@@ -699,6 +717,14 @@ a.download:hover { opacity: 0.9; }
       card.appendChild(row);
       card.appendChild(audio);
       resultCards.appendChild(card);
+    }
+
+    if (job.source_subtitle) {
+      const src = document.createElement('div');
+      src.style.marginTop = '8px';
+      src.innerHTML = '<a class="download" href="' + job.source_subtitle +
+        '" download>원어 자막 (transcript.srt)</a>';
+      resultCards.appendChild(src);
     }
   }
 
@@ -735,11 +761,17 @@ a.download:hover { opacity: 0.9; }
   }
 
   function stageLabel(stage) {
+    if (!stage) return '';
+    if (stage.indexOf(':') >= 0) {
+      const parts = stage.split(':');
+      const m = { synthesizing: '음성 합성', aligning: '타이밍 정렬', mixing: '믹싱' }[parts[0]] || parts[0];
+      return m + ' (' + parts[1] + ')';
+    }
     const labels = {
-      ingesting: '소스 분석 중',
-      dubbing: '더빙 생성 중',
-      finalizing: '마무리 중',
-      transcribing: '자막 생성 중',
+      starting: '시작', ingesting: '소스 분석 중', transcribing: '자막 생성 중',
+      separating: '음원 분리 중', translating: '번역 중',
+      'loading subtitles': '자막 로드 중', 'preparing voices': '보이스 준비 중',
+      dubbing: '더빙 생성 중', finalizing: '마무리 중',
     };
     return labels[stage] || stage;
   }
@@ -775,6 +807,74 @@ a.download:hover { opacity: 0.9; }
     div.textContent = str == null ? '' : String(str);
     return div.innerHTML;
   }
+
+  // ---------------------------------------------------------------------------
+  // Jobs monitor — live view of all jobs (queue / running stage / past durations)
+  // ---------------------------------------------------------------------------
+  const jobsList = document.getElementById('jobs-list');
+  const jobsCount = document.getElementById('jobs-count');
+
+  function statusBadge(status) {
+    const color = { queued: '#9e9e9e', running: '#4fc3f7', done: '#81c784', error: '#e57373' }[status] || '#9e9e9e';
+    const text = { queued: '대기', running: '진행', done: '완료', error: '오류' }[status] || status;
+    return '<span style="display:inline-block; padding:1px 8px; border-radius:10px; background:' +
+      color + '; color:#000; font-size:0.72rem; font-weight:700">' + text + '</span>';
+  }
+
+  function jobRow(j) {
+    const langs = (j.target_languages || [])
+      .map((l) => '<span class="chip">' + escapeHtml(l) + '</span>').join('');
+    let info = '';
+    if (j.status === 'running') info = '단계: ' + escapeHtml(stageLabel(j.stage || ''));
+    else if (j.status === 'queued') info = '대기 중';
+    else if (j.status === 'done') info = '소요: ' + formatDuration(j.duration_seconds || 0);
+    else if (j.status === 'error') info = '<span style="color:#e57373">' + escapeHtml(j.error || '오류') + '</span>';
+
+    let dls = '';
+    if (j.status === 'done') {
+      const parts = [];
+      if (j.source_subtitle)
+        parts.push('<a class="download" href="' + j.source_subtitle + '" download>원어 자막</a>');
+      const outputs = j.outputs || {};
+      for (const lang in outputs) {
+        const o = outputs[lang];
+        parts.push('<a class="download" href="' + o.result_url + '" download>' + escapeHtml(lang) + ' 음성</a>');
+        if (o.srt_url)
+          parts.push('<a class="download" href="' + o.srt_url + '" download>' + escapeHtml(lang) + ' 자막</a>');
+      }
+      dls = '<div style="margin-top:6px; display:flex; flex-wrap:wrap; gap:10px">' + parts.join('') + '</div>';
+    }
+
+    const when = (j.created_at || '').replace('T', ' ').slice(0, 19);
+    return '<div class="result-card" style="margin-bottom:8px">' +
+      '<div class="lang-row"><span>' + statusBadge(j.status) + ' &nbsp;' +
+        escapeHtml(j.source_name || '-') + '</span><span>' + langs + '</span></div>' +
+      '<div class="progress-meta" style="margin-top:4px"><span>' + info +
+        '</span><span style="color:var(--text-dim)">' + escapeHtml(when) + '</span></div>' +
+      dls + '</div>';
+  }
+
+  function renderJobs(jobs) {
+    const q = jobs.filter((j) => j.status === 'queued').length;
+    const r = jobs.filter((j) => j.status === 'running').length;
+    jobsCount.textContent = jobs.length
+      ? '— 전체 ' + jobs.length + ' · 진행 ' + r + ' · 대기 ' + q : '';
+    jobsList.innerHTML = jobs.length
+      ? jobs.map(jobRow).join('')
+      : '<div class="status-idle">아직 제출된 작업이 없습니다.</div>';
+  }
+
+  async function refreshJobs() {
+    try {
+      const res = await fetch('/jobs');
+      if (!res.ok) return;
+      const data = await res.json();
+      renderJobs(data.jobs || []);
+    } catch (e) { /* transient — keep polling */ }
+  }
+
+  refreshJobs();
+  setInterval(refreshJobs, 2000);
 
   // Initial state
   updateSubmitState();

@@ -35,12 +35,22 @@ def dub(
     max_speedup: float = 1.3,
     duck: bool = False,
     duck_db: float = -12.0,
+    progress=None,
 ) -> dict[str, str]:
-    """Run the pipeline. Returns {language: output_wav_path}."""
+    """Run the pipeline. Returns {language: output_wav_path}.
+
+    Also writes subtitles into `outdir`: `transcript.srt` (source language) and
+    `dub_<lang>.srt` (translated) per target language. `progress` is an optional
+    callback(stage: str) invoked at each stage for monitoring.
+    """
     work = Path(outdir)
     work.mkdir(parents=True, exist_ok=True)
     chalna = ChalnaClient()
     engine = engine or Qwen3Engine()
+
+    def _p(stage: str) -> None:
+        if progress:
+            progress(stage)
 
     # --- build the Doc: from a subtitle file, or by ingesting + transcribing audio ---
     manual = manual_voices or {}
@@ -49,6 +59,7 @@ def dub(
         # Subtitle entry (docs/spec.md §3): no audio -> no background; the voice must
         # be manual (a single voice covers all speakers).
         keep_background = False
+        _p("loading subtitles")
         doc = subtitles.load_subtitle_doc(source)
         doc.target_languages = target_languages
         if subs_translated:
@@ -62,10 +73,13 @@ def dub(
                 s.text_target.setdefault(lang, s.text)
         else:
             chalna.ensure_up()
+            _p("translating")
             doc = chalna.translate(doc, target_languages)
     else:
+        _p("ingesting")
         wav = ingest.ingest(source, str(work / "ingest"))
         chalna.ensure_up()
+        _p("transcribing")
         doc = chalna.transcribe(wav)
         doc.target_languages = target_languages
 
@@ -75,16 +89,22 @@ def dub(
         single_voice = len(manual) == 1
         need_vocals = not single_voice and any(s.speaker_id not in manual for s in doc.segments)
         if keep_background or need_vocals:
+            _p("separating")
             vocals, background = AudioSeparator().separate(wav, str(work / "sep"))
             doc.vocals_audio = vocals
             if keep_background:
                 doc.background_audio = background
 
         if not subs_translated:
+            _p("translating")
             doc = chalna.translate(doc, target_languages)
 
+    # Source-language transcript subtitle (e.g. Korean).
+    subtitles.write_srt(doc.segments, str(work / "transcript.srt"), lambda s: s.text)
+
     # --- per speaker: voices ---
-    voices = resolve_voices(doc, engine, manual=manual)
+    _p("preparing voices")
+    voices = resolve_voices(doc, engine, manual=manual, workdir=str(work / "refs"))
 
     # Anchor output length to the original timeline so trailing music/outro after
     # the last spoken segment is preserved (codex review P0-2).
@@ -96,15 +116,21 @@ def dub(
         missing = [s.index for s in doc.segments if lang not in s.text_target]
         if missing:
             raise ValueError(f"missing {lang} translation for segments {missing[:5]}...")
+        # Translated subtitle for this language.
+        subtitles.write_srt(doc.segments, str(work / f"dub_{lang}.srt"), lambda s: s.text_target.get(lang, ""))
+
+        _p(f"synthesizing:{lang}")
         items = [SynthItem(text=s.text_target[lang], language=lang, voice=voices[s.speaker_id]) for s in doc.segments]
         results = engine.synthesize_batch(items)
         clips = [w for w, _ in results]
         sr = results[0][1] if results else 24000
 
+        _p(f"aligning:{lang}")
         track, meta = align.align_track(doc.segments, clips, sr, max_speedup=max_speedup, floor_sec=floor_sec)
         for m, seg in zip(meta, doc.segments):     # write alignment metadata back to the doc
             seg.fitted_speedup[lang] = m["speedup"]
             seg.overran[lang] = m["overran"]
+        _p(f"mixing:{lang}")
         final = mix.mix(track, sr, doc.background_audio if keep_background else None, duck=duck, duck_db=duck_db)
 
         out_path = str(work / f"dub_{lang}.wav")
