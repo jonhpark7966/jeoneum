@@ -6,7 +6,23 @@
 영상·오디오를 입력하면 **화자별 목소리를 유지한 채 다른 언어로 더빙**해 주는 엔드투엔드 파이프라인.
 범용 다국어 더빙 툴을 지향하며, 한국어 YouTube 영상을 영어로 더빙하는 것이 1차 검증 시나리오.
 
-> ⚠️ **Status: 스펙 확정 + 골격(skeleton) 단계.** `src/jeoneum/`에 모듈 골격이 있으며(검증된 align/mix는 실제 구현, 크로스레포 부분은 스텁), 본격 구현 전입니다. 상세 설계는 [`docs/spec.md`](docs/spec.md).
+> ✅ **Status: 동작하는 엔드투엔드 구현.** CLI · REST API · WebUI · Docker 서빙까지 구현·검증 완료.
+> 상세 설계 [`docs/spec.md`](docs/spec.md), 사용법 [`docs/usage.md`](docs/usage.md).
+
+## 구현 상태 (2026-06-01 기준)
+
+**동작 확인됨**
+- **풀 파이프라인**: 영상/오디오/URL/자막 → chalna 전사·번역 → (배경 보존 시 음원 분리) → Qwen3-TTS 화자별 보이스 클론 → 타이밍 정렬 → 믹스 → **더빙 오디오 + 원어 SRT(`transcript.srt`) + 번역 SRT(`dub_<lang>.srt`)**. 5분 클립 e2e 검증.
+- **화자 보이스**: 단일 수동 보이스(모든 화자 적용) / **화자별 자동 클론**(원본 또는 분리 vocals에서 화자 구간 ref 추출, 크로스링구얼).
+- **자막 입력**: SRT/JSON(원어 또는 번역본). 번역은 chalna 내부 codex(길이 인식).
+- **인터페이스**: `jeoneum dub` CLI · REST(`POST /dub` 잡 + `GET /jobs` 모니터 + 음성/자막 다운로드) · **WebUI**(업로드/URL·화자 보이스·옵션·진행 단계·큐·완료 소요시간·다운로드) · **Docker compose 서빙**.
+- **chalna**: `/transcribe`(조기 EOS 커버리지, duration 비례 패스) · `/translate`(codex) · `/doctor`(셋업 진단) · 컨테이너 내 codex(호스트 OAuth 인증 마운트).
+
+**TODO / 한계**
+- **배경음 보존 믹싱 품질 테스트** — audio-separator 분리 → ducking 믹스 음질 검증 미완.
+- **화자 분리(diarization) 정확도** — chalna가 화자 수를 가끔 오판(짧은 클립).
+- **audio-separator는 CPU** — onnxruntime-gpu가 CUDA-13 torch와 충돌해 CPU 사용, 5분+ 분리 느림.
+- **다국어 동시 스케줄러 / 보이스 레지스트리(영상 간 일관성)** 미구현.
 
 ---
 
