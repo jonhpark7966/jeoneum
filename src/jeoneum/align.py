@@ -42,6 +42,8 @@ def align_track(
     duration so trailing music/outro is preserved by the later mix). `headroom`
     normalizes only when the additive overlap clips, leaving room for the mix.
     """
+    if len(clips) != len(segments):
+        raise ValueError(f"clip/segment count mismatch: {len(clips)} clips vs {len(segments)} segments")
     placements, meta = [], []
     for i, (seg, wav) in enumerate(zip(segments, clips)):
         next_start = segments[i + 1].start_time if i + 1 < len(segments) else None

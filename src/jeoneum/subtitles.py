@@ -61,15 +61,10 @@ def _segments_from_json(data: dict) -> list[Segment]:
 
 
 def _sec_to_ts(t: float) -> str:
-    if t < 0:
-        t = 0.0
-    h = int(t // 3600)
-    m = int((t % 3600) // 60)
-    s = int(t % 60)
-    ms = int(round((t - int(t)) * 1000))
-    if ms == 1000:  # rounding spillover
-        s += 1
-        ms = 0
+    ms_total = int(round(max(t, 0.0) * 1000))   # round once, then split — no 00:00:60 spillover
+    h, rem = divmod(ms_total, 3_600_000)
+    m, rem = divmod(rem, 60_000)
+    s, ms = divmod(rem, 1_000)
     return f"{h:02d}:{m:02d}:{s:02d},{ms:03d}"
 
 

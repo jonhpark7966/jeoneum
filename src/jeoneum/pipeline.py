@@ -54,7 +54,8 @@ def dub(
 
     # --- build the Doc: from a subtitle file, or by ingesting + transcribing audio ---
     manual = manual_voices or {}
-    is_subs = source.lower().endswith((".srt", ".json"))
+    is_url = source.startswith(("http://", "https://"))
+    is_subs = (not is_url) and source.lower().endswith((".srt", ".json"))
     if is_subs:
         # Subtitle entry (docs/spec.md §3): no audio -> no background; the voice must
         # be manual (a single voice covers all speakers).
@@ -94,9 +95,9 @@ def dub(
             doc.vocals_audio = vocals
             doc.background_audio = background
 
-        if not subs_translated:
-            _p("translating")
-            doc = chalna.translate(doc, target_languages)
+        # subs_translated only applies to subtitle sources; audio always needs translation.
+        _p("translating")
+        doc = chalna.translate(doc, target_languages)
 
     # Source-language transcript subtitle (e.g. Korean).
     subtitles.write_srt(doc.segments, str(work / "transcript.srt"), lambda s: s.text)
@@ -115,18 +116,22 @@ def dub(
         missing = [s.index for s in doc.segments if lang not in s.text_target]
         if missing:
             raise ValueError(f"missing {lang} translation for segments {missing[:5]}...")
-        # Translated subtitle for this language.
+        # Translated subtitle uses all cues; synthesis skips empty translations
+        # (e.g. non-speech segments) so we never synthesize/align blank clips.
         subtitles.write_srt(doc.segments, str(work / f"dub_{lang}.srt"), lambda s: s.text_target.get(lang, ""))
+        lang_segs = [s for s in doc.segments if (s.text_target.get(lang) or "").strip()]
+        if not lang_segs:
+            raise ValueError(f"no non-empty {lang} text to synthesize")
 
         _p(f"synthesizing:{lang}")
-        items = [SynthItem(text=s.text_target[lang], language=lang, voice=voices[s.speaker_id]) for s in doc.segments]
+        items = [SynthItem(text=s.text_target[lang], language=lang, voice=voices[s.speaker_id]) for s in lang_segs]
         results = engine.synthesize_batch(items)
         clips = [w for w, _ in results]
         sr = results[0][1] if results else 24000
 
         _p(f"aligning:{lang}")
-        track, meta = align.align_track(doc.segments, clips, sr, max_speedup=max_speedup, floor_sec=floor_sec)
-        for m, seg in zip(meta, doc.segments):     # write alignment metadata back to the doc
+        track, meta = align.align_track(lang_segs, clips, sr, max_speedup=max_speedup, floor_sec=floor_sec)
+        for m, seg in zip(meta, lang_segs):        # write alignment metadata back to the doc
             seg.fitted_speedup[lang] = m["speedup"]
             seg.overran[lang] = m["overran"]
         _p(f"mixing:{lang}")

@@ -295,6 +295,9 @@ async def get_subtitle(job_id: str, key: str):
         raise HTTPException(status_code=404, detail="Job not found")
     if job.status != "done":
         raise HTTPException(status_code=404, detail="Result not available")
+    # Constrain key to 'source' or a known output language (no path traversal).
+    if key != "source" and key not in job.outputs:
+        raise HTTPException(status_code=404, detail="Subtitle not available")
 
     out_dir = RESULTS_DIR / job_id / "out"
     if key == "source":
