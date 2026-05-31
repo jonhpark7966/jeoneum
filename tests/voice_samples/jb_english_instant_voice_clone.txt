@@ -1,0 +1,1 @@
+This voice clone should sound clear, natural, and consistent. I rarely read long scripts like this, but today I want to test rhythm, stress, and pronunciation. The system should handle words like vector, zero, vivid, script, and thought without sounding forced.

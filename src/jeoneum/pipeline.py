@@ -54,7 +54,10 @@ def dub(
     # Separation is needed for background preservation AND for auto voice cloning
     # (vocals stem -> per-speaker ref). Decouple the two (codex review P0-1).
     manual = manual_voices or {}
-    need_vocals = any(s.speaker_id not in manual for s in doc.segments)
+    # A single manual voice covers all speakers (see voices.resolve_voices), so no
+    # vocals stem is needed in that case.
+    single_voice = len(manual) == 1
+    need_vocals = not single_voice and any(s.speaker_id not in manual for s in doc.segments)
     if keep_background or need_vocals:
         vocals, background = AudioSeparator().separate(wav, str(work / "sep"))
         doc.vocals_audio = vocals

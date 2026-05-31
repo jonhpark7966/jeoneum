@@ -20,6 +20,7 @@ out/
 *.mp3
 *.mp4
 !assets/**
+!tests/voice_samples/**
 
 # Models / large data
 pretrained_models/

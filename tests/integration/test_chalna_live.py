@@ -39,8 +39,9 @@ def test_doctor_reports_setup(client):
 
 
 # min_covered guards the early-EOS coverage fix: transcription must reach near the
-# end of the clip (clips are ~17.1s and ~31.3s), not stop ~halfway.
-@pytest.mark.parametrize("clip,min_covered", [("voice_2spk.wav", 15.0), ("voice_1spk.wav", 28.0)])
+# end of the ~31s clip, not stop ~halfway. (voice_2spk is now a 5-min clip kept for
+# manual diarization work — too slow for the routine suite.)
+@pytest.mark.parametrize("clip,min_covered", [("voice_1spk.wav", 28.0)])
 def test_transcribe_returns_doc(client, clip, min_covered):
     path = ASSETS / clip
     if not path.exists():
