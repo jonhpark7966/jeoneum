@@ -80,9 +80,10 @@ def resolve_voices(
             handles[sp] = handle_for(manual[sp])
         elif default is not None:
             handles[sp] = default
-        elif doc.vocals_audio:
+        elif doc.vocals_audio or doc.audio_path:
+            src_audio = doc.vocals_audio or doc.audio_path   # clean vocals if separated, else original
             ref_audio, ref_text = extract_ref(
-                doc.vocals_audio, doc, sp, workdir or str(Path(doc.vocals_audio).parent / "refs")
+                src_audio, doc, sp, workdir or str(Path(src_audio).parent / "refs")
             )
             cache_key = (ref_audio, ref_text)
             if cache_key not in cache:

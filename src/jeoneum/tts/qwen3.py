@@ -50,12 +50,15 @@ class Qwen3Engine(TTSEngine):
         )[0]
         return VoiceHandle(item)
 
-    def synthesize_batch(self, items: list[SynthItem]) -> list[tuple[np.ndarray, int]]:
-        if not items:
-            return []
-        wavs, sr = self._model.generate_voice_clone(
-            text=[it.text for it in items],
-            language=[_normalize_language(it.language) for it in items],
-            voice_clone_prompt=[it.voice.payload for it in items],
-        )
-        return [(np.asarray(w, dtype=np.float32), sr) for w in wavs]
+    def synthesize_batch(self, items: list[SynthItem], batch_size: int = 8) -> list[tuple[np.ndarray, int]]:
+        # Chunk so long inputs (many segments) don't OOM the GPU in one generate call.
+        out: list[tuple[np.ndarray, int]] = []
+        for i in range(0, len(items), batch_size):
+            chunk = items[i : i + batch_size]
+            wavs, sr = self._model.generate_voice_clone(
+                text=[it.text for it in chunk],
+                language=[_normalize_language(it.language) for it in chunk],
+                voice_clone_prompt=[it.voice.payload for it in chunk],
+            )
+            out.extend((np.asarray(w, dtype=np.float32), sr) for w in wavs)
+        return out

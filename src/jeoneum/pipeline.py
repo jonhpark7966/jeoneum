@@ -78,22 +78,21 @@ def dub(
     else:
         _p("ingesting")
         wav = ingest.ingest(source, str(work / "ingest"))
+        doc_audio = wav
         chalna.ensure_up()
         _p("transcribing")
         doc = chalna.transcribe(wav)
         doc.target_languages = target_languages
+        doc.audio_path = wav   # fallback source for auto per-speaker ref extraction
 
-        # Separation is needed for background preservation AND for auto voice cloning
-        # (vocals stem -> per-speaker ref). A single manual voice covers all speakers
-        # (voices.resolve_voices), so no vocals stem is needed in that case.
-        single_voice = len(manual) == 1
-        need_vocals = not single_voice and any(s.speaker_id not in manual for s in doc.segments)
-        if keep_background or need_vocals:
+        # Separation is only needed to preserve the background. When kept, the clean
+        # vocals stem is also used for per-speaker ref extraction; otherwise refs are
+        # cut from the original audio (avoids a slow separation pass we don't need).
+        if keep_background:
             _p("separating")
             vocals, background = AudioSeparator().separate(wav, str(work / "sep"))
             doc.vocals_audio = vocals
-            if keep_background:
-                doc.background_audio = background
+            doc.background_audio = background
 
         if not subs_translated:
             _p("translating")

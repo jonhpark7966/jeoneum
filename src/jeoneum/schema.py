@@ -43,6 +43,7 @@ class Doc(BaseModel):
     source: Source
     target_languages: list[str] = Field(default_factory=list)
     background_audio: Optional[str] = None      # Instrumental stem (preserved)
-    vocals_audio: Optional[str] = None          # Vocals stem (for ref extraction)
+    vocals_audio: Optional[str] = None          # Vocals stem (clean ref extraction)
+    audio_path: Optional[str] = None            # working wav (ref extraction fallback)
     voices: dict[str, Voice] = Field(default_factory=dict)  # speaker_id -> Voice
     segments: list[Segment] = Field(default_factory=list)
