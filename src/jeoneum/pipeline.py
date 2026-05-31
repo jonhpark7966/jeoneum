@@ -14,7 +14,7 @@ from pathlib import Path
 
 import soundfile as sf
 
-from . import align, ingest, mix
+from . import align, ingest, mix, subtitles
 from .chalna_client import ChalnaClient
 from .schema import Doc, Voice
 from .separate import AudioSeparator
@@ -42,33 +42,49 @@ def dub(
     chalna = ChalnaClient()
     engine = engine or Qwen3Engine()
 
-    # --- once: ingest + transcribe + separate ---
+    # --- build the Doc: from a subtitle file, or by ingesting + transcribing audio ---
+    manual = manual_voices or {}
     is_subs = source.lower().endswith((".srt", ".json"))
     if is_subs:
-        raise NotImplementedError("load Doc from subtitle file (source/translated per --subs-translated)")
-    wav = ingest.ingest(source, str(work / "ingest"))
-    chalna.ensure_up()
-    doc: Doc = chalna.transcribe(wav)
-    doc.target_languages = target_languages
+        # Subtitle entry (docs/spec.md §3): no audio -> no background; the voice must
+        # be manual (a single voice covers all speakers).
+        keep_background = False
+        doc = subtitles.load_subtitle_doc(source)
+        doc.target_languages = target_languages
+        if subs_translated:
+            if len(target_languages) != 1:
+                raise ValueError(
+                    "--subs-translated requires exactly one target language "
+                    "(the language the subtitles are already written in)"
+                )
+            lang = target_languages[0]
+            for s in doc.segments:
+                s.text_target.setdefault(lang, s.text)
+        else:
+            chalna.ensure_up()
+            doc = chalna.translate(doc, target_languages)
+    else:
+        wav = ingest.ingest(source, str(work / "ingest"))
+        chalna.ensure_up()
+        doc = chalna.transcribe(wav)
+        doc.target_languages = target_languages
 
-    # Separation is needed for background preservation AND for auto voice cloning
-    # (vocals stem -> per-speaker ref). Decouple the two (codex review P0-1).
-    manual = manual_voices or {}
-    # A single manual voice covers all speakers (see voices.resolve_voices), so no
-    # vocals stem is needed in that case.
-    single_voice = len(manual) == 1
-    need_vocals = not single_voice and any(s.speaker_id not in manual for s in doc.segments)
-    if keep_background or need_vocals:
-        vocals, background = AudioSeparator().separate(wav, str(work / "sep"))
-        doc.vocals_audio = vocals
-        if keep_background:
-            doc.background_audio = background
+        # Separation is needed for background preservation AND for auto voice cloning
+        # (vocals stem -> per-speaker ref). A single manual voice covers all speakers
+        # (voices.resolve_voices), so no vocals stem is needed in that case.
+        single_voice = len(manual) == 1
+        need_vocals = not single_voice and any(s.speaker_id not in manual for s in doc.segments)
+        if keep_background or need_vocals:
+            vocals, background = AudioSeparator().separate(wav, str(work / "sep"))
+            doc.vocals_audio = vocals
+            if keep_background:
+                doc.background_audio = background
 
-    if not subs_translated:
-        doc = chalna.translate(doc, target_languages)
+        if not subs_translated:
+            doc = chalna.translate(doc, target_languages)
 
     # --- per speaker: voices ---
-    voices = resolve_voices(doc, engine, manual=manual_voices)
+    voices = resolve_voices(doc, engine, manual=manual)
 
     # Anchor output length to the original timeline so trailing music/outro after
     # the last spoken segment is preserved (codex review P0-2).

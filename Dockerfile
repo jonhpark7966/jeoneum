@@ -26,8 +26,10 @@ RUN python -m pip install --upgrade pip setuptools wheel \
 # jeoneum metadata + deps. README.md is COPYed because pyproject readme = "README.md".
 COPY pyproject.toml README.md /app/
 COPY src /app/src
-RUN pip install -e /app
-# RUN pip install -e ".[gpu]"  # optional: source separation (BS-Roformer); verify CUDA pins
+# [cpu] pulls audio-separator with CPU onnxruntime (background separation). CPU is
+# used deliberately: onnxruntime-gpu targets CUDA 11/12 and conflicts with the
+# CUDA-13 torch build here (docs/spec.md §10).
+RUN pip install -e "/app[cpu]"
 
 RUN mkdir -p /data/results /models
 

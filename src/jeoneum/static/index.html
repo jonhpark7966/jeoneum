@@ -332,8 +332,8 @@ a.download:hover { opacity: 0.9; }
     <h2>입력</h2>
 
     <div class="drop-zone" id="drop-zone">
-      <p>소스 파일을 드래그하거나 클릭하여 업로드</p>
-      <p style="font-size:0.8rem; margin-top:4px; color:var(--text-dim)">mp3, wav, m4a, mp4, mov, mkv, srt, json …</p>
+      <p>소스 파일(영상 · 오디오 · 자막)을 드래그하거나 클릭하여 업로드</p>
+      <p style="font-size:0.8rem; margin-top:4px; color:var(--text-dim)">영상/오디오: mp3, wav, m4a, mp4, mov, mkv … &nbsp;|&nbsp; 자막: srt, json</p>
       <input type="file" id="file-input" accept=".mp3,.wav,.m4a,.flac,.ogg,.mp4,.mov,.webm,.mkv,.avi,.srt,.json">
     </div>
 
@@ -370,7 +370,7 @@ a.download:hover { opacity: 0.9; }
     <div class="checkbox-group">
       <label><input type="checkbox" id="opt-keepbg" checked> 배경음 보존</label>
       <label><input type="checkbox" id="opt-duck"> 배경음 더킹</label>
-      <label><input type="checkbox" id="opt-subs"> 입력 자막이 이미 번역됨</label>
+      <label><input type="checkbox" id="opt-subs"> 입력 자막이 이미 번역됨 <span style="color:var(--text-dim); font-size:0.8rem">— 자막(SRT/JSON)을 소스로 올렸고, 이미 타깃 언어로 번역되어 있을 때만 체크 (번역 단계 건너뜀)</span></label>
     </div>
 
     <div class="inline-field">
