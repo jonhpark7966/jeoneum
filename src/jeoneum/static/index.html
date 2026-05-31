@@ -1,0 +1,784 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>전음 (Jeoneum) — 다국어 더빙</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #1a1a2e;
+  --card: #16213e;
+  --accent: #0f3460;
+  --accent-bright: #1a5276;
+  --text: #e0e0e0;
+  --text-dim: #8899aa;
+  --success: #27ae60;
+  --error: #e74c3c;
+  --warning: #f39c12;
+  --border: #2a3a5e;
+  --radius: 8px;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  line-height: 1.5;
+}
+
+header {
+  background: var(--card);
+  border-bottom: 1px solid var(--border);
+  padding: 16px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+header h1 {
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+header h1 span { color: var(--text-dim); font-weight: 400; font-size: 0.9rem; }
+
+header a {
+  color: var(--text-dim);
+  text-decoration: none;
+  font-size: 0.85rem;
+}
+header a:hover { color: var(--text); }
+
+.container {
+  display: grid;
+  grid-template-columns: 340px 1fr;
+  gap: 20px;
+  max-width: 1200px;
+  margin: 24px auto;
+  padding: 0 24px;
+}
+
+@media (max-width: 768px) {
+  .container { grid-template-columns: 1fr; }
+}
+
+/* --- Panel --- */
+.panel {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+}
+
+.panel h2 {
+  font-size: 0.95rem;
+  font-weight: 600;
+  margin-bottom: 16px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Drop zone */
+.drop-zone {
+  border: 2px dashed var(--border);
+  border-radius: var(--radius);
+  padding: 28px 16px;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
+  margin-bottom: 12px;
+}
+
+.drop-zone:hover, .drop-zone.dragover {
+  border-color: var(--accent-bright);
+  background: rgba(15, 52, 96, 0.2);
+}
+
+.drop-zone.has-file {
+  border-color: var(--success);
+  border-style: solid;
+}
+
+.drop-zone p { color: var(--text-dim); font-size: 0.9rem; }
+.drop-zone .file-name { color: var(--text); font-weight: 500; margin-top: 4px; word-break: break-all; }
+.drop-zone .file-size { color: var(--text-dim); font-size: 0.8rem; }
+.drop-zone input { display: none; }
+
+/* Smaller drop zone (voice sample) */
+.drop-zone.small { padding: 16px; }
+
+/* OR divider */
+.or-divider {
+  text-align: center;
+  color: var(--text-dim);
+  font-size: 0.8rem;
+  margin: 4px 0 10px;
+}
+
+/* Form fields */
+label.field {
+  display: block;
+  margin-bottom: 14px;
+}
+
+label.field .label-text {
+  display: block;
+  font-size: 0.85rem;
+  color: var(--text-dim);
+  margin-bottom: 4px;
+}
+
+textarea, input[type="text"], input[type="number"] {
+  width: 100%;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text);
+  padding: 8px 12px;
+  font-size: 0.9rem;
+  font-family: inherit;
+  resize: vertical;
+}
+
+textarea:focus, input[type="text"]:focus, input[type="number"]:focus {
+  outline: none;
+  border-color: var(--accent-bright);
+}
+
+.checkbox-group { margin-bottom: 16px; }
+
+.checkbox-group label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.9rem;
+  cursor: pointer;
+  margin-bottom: 8px;
+}
+
+.checkbox-group input[type="checkbox"] {
+  accent-color: var(--accent-bright);
+  width: 16px;
+  height: 16px;
+}
+
+.inline-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.9rem;
+  margin-bottom: 8px;
+}
+.inline-field label { color: var(--text-dim); flex: 1; }
+.inline-field input[type="number"] { width: 90px; flex: none; }
+
+hr.sep {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 16px 0;
+}
+
+button.submit {
+  width: 100%;
+  padding: 12px;
+  background: var(--accent);
+  border: 1px solid var(--accent-bright);
+  border-radius: var(--radius);
+  color: var(--text);
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+button.submit:hover:not(:disabled) { background: var(--accent-bright); }
+button.submit:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* --- Right Panel --- */
+.status-idle { color: var(--text-dim); text-align: center; padding: 48px 16px; font-size: 0.95rem; }
+
+/* Progress */
+.progress-header { margin-bottom: 20px; }
+.progress-title { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; }
+.progress-title span:first-child { font-size: 1rem; font-weight: 500; }
+.progress-stage { font-size: 0.9rem; color: var(--accent-bright); font-weight: 500; }
+.progress-meta { display: flex; justify-content: space-between; font-size: 0.85rem; color: var(--text-dim); margin-top: 6px; }
+
+.progress-bar-bg {
+  width: 100%;
+  height: 8px;
+  background: var(--bg);
+  border-radius: 4px;
+  overflow: hidden;
+  margin: 10px 0;
+  position: relative;
+}
+
+/* Indeterminate animated bar */
+.progress-bar-indet {
+  position: absolute;
+  height: 100%;
+  width: 40%;
+  background: linear-gradient(90deg, #0f3460, #1a5276);
+  border-radius: 4px;
+  animation: indet 1.4s ease-in-out infinite;
+}
+
+@keyframes indet {
+  0%   { left: -40%; }
+  100% { left: 100%; }
+}
+
+.progress-langs {
+  margin-top: 14px;
+  font-size: 0.85rem;
+  color: var(--text-dim);
+}
+.progress-langs .chip {
+  display: inline-block;
+  background: var(--accent);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 2px 8px;
+  margin: 2px 4px 2px 0;
+  color: var(--text);
+  font-size: 0.8rem;
+}
+
+/* Result */
+.result-section h3 {
+  font-size: 0.95rem;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+
+.result-card {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px;
+  margin-bottom: 12px;
+}
+
+.result-card .lang-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.lang-code {
+  display: inline-block;
+  font-size: 0.85rem;
+  font-weight: 600;
+  background: var(--accent);
+  border: 1px solid var(--accent-bright);
+  border-radius: 4px;
+  padding: 3px 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.result-card audio {
+  width: 100%;
+  margin-bottom: 10px;
+  display: block;
+}
+
+a.download {
+  display: inline-block;
+  padding: 7px 18px;
+  background: var(--success);
+  border: none;
+  border-radius: var(--radius);
+  color: #fff;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+a.download:hover { opacity: 0.9; }
+
+.result-meta { font-size: 0.85rem; color: var(--text-dim); margin-bottom: 12px; }
+
+/* Error */
+.error-box {
+  background: rgba(231, 76, 60, 0.1);
+  border: 1px solid var(--error);
+  border-radius: var(--radius);
+  padding: 16px;
+  color: var(--error);
+}
+
+.error-box .error-title { font-weight: 600; margin-bottom: 4px; }
+.error-box .error-msg { font-size: 0.9rem; word-break: break-word; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>전음 (Jeoneum) <span>— 다국어 더빙</span></h1>
+  <a href="/docs">API Docs</a>
+</header>
+
+<div class="container">
+  <!-- Left: Input Panel -->
+  <div class="panel" id="input-panel">
+    <h2>입력</h2>
+
+    <div class="drop-zone" id="drop-zone">
+      <p>소스 파일을 드래그하거나 클릭하여 업로드</p>
+      <p style="font-size:0.8rem; margin-top:4px; color:var(--text-dim)">mp3, wav, m4a, mp4, mov, mkv, srt, json …</p>
+      <input type="file" id="file-input" accept=".mp3,.wav,.m4a,.flac,.ogg,.mp4,.mov,.webm,.mkv,.avi,.srt,.json">
+    </div>
+
+    <div class="or-divider">또는</div>
+
+    <label class="field">
+      <span class="label-text">YouTube / URL</span>
+      <input type="text" id="url-input" placeholder="https://youtube.com/watch?v=...">
+    </label>
+
+    <hr class="sep">
+
+    <label class="field">
+      <span class="label-text">타깃 언어 (쉼표로 구분)</span>
+      <input type="text" id="langs-input" value="en" placeholder="en,ja">
+    </label>
+
+    <label class="field">
+      <span class="label-text">화자 보이스 샘플 (모든 화자에 적용)</span>
+    </label>
+    <div class="drop-zone small" id="voice-drop-zone">
+      <p>보이스 샘플 업로드 (선택)</p>
+      <p style="font-size:0.8rem; margin-top:4px; color:var(--text-dim)">wav, mp3, m4a, flac, ogg</p>
+      <input type="file" id="voice-input" accept=".wav,.mp3,.m4a,.flac,.ogg">
+    </div>
+
+    <label class="field">
+      <span class="label-text">보이스 샘플 대본 (선택)</span>
+      <textarea id="reftext-input" rows="2" placeholder="보이스 샘플의 발화 내용 (클로닝 품질 향상)"></textarea>
+    </label>
+
+    <hr class="sep">
+
+    <div class="checkbox-group">
+      <label><input type="checkbox" id="opt-keepbg" checked> 배경음 보존</label>
+      <label><input type="checkbox" id="opt-duck"> 배경음 더킹</label>
+      <label><input type="checkbox" id="opt-subs"> 입력 자막이 이미 번역됨</label>
+    </div>
+
+    <div class="inline-field">
+      <label for="opt-duckdb">더킹 감쇠 (dB)</label>
+      <input type="number" id="opt-duckdb" value="-12" step="1">
+    </div>
+    <div class="inline-field">
+      <label for="opt-speedup">최대 압축 배율</label>
+      <input type="number" id="opt-speedup" value="1.3" step="0.05" min="1.0">
+    </div>
+
+    <button class="submit" id="btn-submit" disabled>더빙 시작</button>
+  </div>
+
+  <!-- Right: Status / Result Panel -->
+  <div class="panel" id="result-panel">
+    <h2>결과</h2>
+
+    <div id="view-idle" class="status-idle">
+      소스를 업로드하고 더빙을 시작하세요.
+    </div>
+
+    <div id="view-progress" style="display:none">
+      <div class="progress-header">
+        <div class="progress-title">
+          <span>처리 중...</span>
+          <span class="progress-stage" id="progress-stage"></span>
+        </div>
+        <div class="progress-bar-bg"><div class="progress-bar-indet"></div></div>
+        <div class="progress-meta">
+          <span id="progress-elapsed">경과: 0초</span>
+          <span id="progress-status-text"></span>
+        </div>
+      </div>
+      <div class="progress-langs" id="progress-langs"></div>
+    </div>
+
+    <div id="view-result" style="display:none">
+      <div class="result-section">
+        <h3>더빙 완료</h3>
+        <div class="result-meta" id="result-meta"></div>
+        <div id="result-cards"></div>
+      </div>
+    </div>
+
+    <div id="view-error" style="display:none">
+      <div class="error-box">
+        <div class="error-title" id="error-title">오류</div>
+        <div class="error-msg" id="error-msg"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function() {
+  'use strict';
+
+  // --- DOM refs ---
+  const dropZone = document.getElementById('drop-zone');
+  const fileInput = document.getElementById('file-input');
+  const urlInput = document.getElementById('url-input');
+  const langsInput = document.getElementById('langs-input');
+  const voiceDropZone = document.getElementById('voice-drop-zone');
+  const voiceInput = document.getElementById('voice-input');
+  const reftextInput = document.getElementById('reftext-input');
+  const optKeepbg = document.getElementById('opt-keepbg');
+  const optDuck = document.getElementById('opt-duck');
+  const optDuckdb = document.getElementById('opt-duckdb');
+  const optSubs = document.getElementById('opt-subs');
+  const optSpeedup = document.getElementById('opt-speedup');
+  const btnSubmit = document.getElementById('btn-submit');
+
+  const viewIdle = document.getElementById('view-idle');
+  const viewProgress = document.getElementById('view-progress');
+  const viewResult = document.getElementById('view-result');
+  const viewError = document.getElementById('view-error');
+
+  const progressStage = document.getElementById('progress-stage');
+  const progressElapsed = document.getElementById('progress-elapsed');
+  const progressStatusText = document.getElementById('progress-status-text');
+  const progressLangs = document.getElementById('progress-langs');
+
+  const resultMeta = document.getElementById('result-meta');
+  const resultCards = document.getElementById('result-cards');
+
+  const errorTitle = document.getElementById('error-title');
+  const errorMsg = document.getElementById('error-msg');
+
+  let selectedFile = null;   // source file
+  let voiceFile = null;      // voice sample file
+  let pollTimer = null;
+  let jobStartTime = null;
+  let elapsedTimer = null;
+
+  // ---------------------------------------------------------------------------
+  // Source file selection (mutually exclusive with URL)
+  // ---------------------------------------------------------------------------
+  bindDropZone(dropZone, (file) => selectSourceFile(file));
+
+  fileInput.addEventListener('change', () => {
+    if (fileInput.files.length > 0) selectSourceFile(fileInput.files[0]);
+  });
+
+  urlInput.addEventListener('input', () => {
+    if (urlInput.value.trim()) {
+      // URL takes over -> clear file selection
+      clearSourceFile();
+    }
+    updateSubmitState();
+  });
+
+  function selectSourceFile(file) {
+    selectedFile = file;
+    urlInput.value = '';   // mutually exclusive
+    dropZone.classList.add('has-file');
+    const sizeMB = (file.size / (1024 * 1024)).toFixed(1);
+    setDropZoneFile(dropZone, fileInput, file.name, sizeMB + ' MB',
+      '.mp3,.wav,.m4a,.flac,.ogg,.mp4,.mov,.webm,.mkv,.avi,.srt,.json',
+      (f) => selectSourceFile(f));
+    updateSubmitState();
+  }
+
+  function clearSourceFile() {
+    selectedFile = null;
+    dropZone.classList.remove('has-file');
+  }
+
+  // ---------------------------------------------------------------------------
+  // Voice sample selection
+  // ---------------------------------------------------------------------------
+  bindDropZone(voiceDropZone, (file) => selectVoiceFile(file));
+
+  voiceInput.addEventListener('change', () => {
+    if (voiceInput.files.length > 0) selectVoiceFile(voiceInput.files[0]);
+  });
+
+  function selectVoiceFile(file) {
+    voiceFile = file;
+    voiceDropZone.classList.add('has-file');
+    const sizeMB = (file.size / (1024 * 1024)).toFixed(1);
+    setDropZoneFile(voiceDropZone, voiceInput, file.name, sizeMB + ' MB',
+      '.wav,.mp3,.m4a,.flac,.ogg', (f) => selectVoiceFile(f));
+  }
+
+  // Generic drop-zone drag/click binding
+  function bindDropZone(zone, onFile) {
+    zone.addEventListener('click', () => {
+      const inp = zone.querySelector('input[type="file"]');
+      if (inp) inp.click();
+    });
+    zone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      zone.classList.add('dragover');
+    });
+    zone.addEventListener('dragleave', () => {
+      zone.classList.remove('dragover');
+    });
+    zone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      zone.classList.remove('dragover');
+      if (e.dataTransfer.files.length > 0) onFile(e.dataTransfer.files[0]);
+    });
+  }
+
+  // Re-render a drop-zone to show the selected file, re-binding a fresh input
+  function setDropZoneFile(zone, oldInput, name, sizeText, accept, onFile) {
+    zone.innerHTML =
+      '<p class="file-name">' + escapeHtml(name) + '</p>' +
+      '<p class="file-size">' + sizeText + '</p>' +
+      '<input type="file" accept="' + accept + '">';
+    const newInput = zone.querySelector('input');
+    newInput.addEventListener('change', () => {
+      if (newInput.files.length > 0) onFile(newInput.files[0]);
+    });
+  }
+
+  function updateSubmitState() {
+    const hasSource = !!selectedFile || urlInput.value.trim().length > 0;
+    btnSubmit.disabled = !hasSource;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Submit
+  // ---------------------------------------------------------------------------
+  btnSubmit.addEventListener('click', async () => {
+    const langs = langsInput.value.trim();
+    if (!selectedFile && !urlInput.value.trim()) {
+      showError('입력 오류', '소스 파일 또는 URL을 입력하세요.');
+      return;
+    }
+    if (!langs) {
+      showError('입력 오류', '타깃 언어를 하나 이상 입력하세요.');
+      return;
+    }
+
+    const fd = new FormData();
+    if (selectedFile) fd.append('file', selectedFile);
+    else fd.append('url', urlInput.value.trim());
+    fd.append('target_languages', langs);
+    if (voiceFile) fd.append('voice_sample', voiceFile);
+    if (reftextInput.value.trim()) fd.append('ref_text', reftextInput.value.trim());
+    fd.append('keep_background', optKeepbg.checked ? 'true' : 'false');
+    fd.append('duck', optDuck.checked ? 'true' : 'false');
+    fd.append('duck_db', optDuckdb.value);
+    fd.append('subs_translated', optSubs.checked ? 'true' : 'false');
+    fd.append('max_speedup', optSpeedup.value);
+
+    showView('progress');
+    btnSubmit.disabled = true;
+    progressStage.textContent = '';
+    progressStatusText.textContent = '업로드 중...';
+    progressLangs.innerHTML = '';
+    jobStartTime = Date.now();
+    startElapsedTimer();
+
+    try {
+      const res = await fetch('/dub', { method: 'POST', body: fd });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(detailToString(errData.detail) || ('HTTP ' + res.status));
+      }
+      const data = await res.json();
+      renderLangChips(data.target_languages || []);
+      startPolling(data.job_id);
+    } catch (err) {
+      showError('요청 실패', err.message);
+      stopElapsedTimer();
+      updateSubmitState();
+    }
+  });
+
+  // ---------------------------------------------------------------------------
+  // Polling
+  // ---------------------------------------------------------------------------
+  function startPolling(jobId) {
+    if (pollTimer) clearInterval(pollTimer);
+    pollJob(jobId);
+    pollTimer = setInterval(() => pollJob(jobId), 2000);
+  }
+
+  function stopPolling() {
+    if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+  }
+
+  async function pollJob(jobId) {
+    try {
+      const res = await fetch('/jobs/' + jobId);
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const job = await res.json();
+      updateProgress(job);
+    } catch (err) {
+      // Transient network error -- keep polling
+      console.error('Poll error:', err);
+    }
+  }
+
+  function updateProgress(job) {
+    if (job.status === 'queued' || job.status === 'running') {
+      progressStatusText.textContent = job.status === 'queued' ? '대기 중' : '진행 중';
+      progressStage.textContent = job.stage ? stageLabel(job.stage) : '';
+      renderLangChips(job.target_languages || []);
+      return;
+    }
+
+    stopPolling();
+    stopElapsedTimer();
+
+    if (job.status === 'done') {
+      showResult(job);
+      updateSubmitState();
+      return;
+    }
+
+    if (job.status === 'error') {
+      showError('더빙 실패', job.error || '알 수 없는 오류');
+      updateSubmitState();
+      return;
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Result rendering
+  // ---------------------------------------------------------------------------
+  function showResult(job) {
+    showView('result');
+
+    if (jobStartTime) {
+      const elapsed = (Date.now() - jobStartTime) / 1000;
+      resultMeta.textContent = '소스: ' + (job.source_name || '-') + ' · 소요 시간: ' + formatDuration(elapsed);
+    } else {
+      resultMeta.textContent = '소스: ' + (job.source_name || '-');
+    }
+
+    resultCards.innerHTML = '';
+    const outputs = job.outputs || {};
+    const langs = Object.keys(outputs);
+
+    if (langs.length === 0) {
+      resultCards.innerHTML = '<div class="status-idle">결과물이 없습니다.</div>';
+      return;
+    }
+
+    for (const lang of langs) {
+      const o = outputs[lang];
+      const card = document.createElement('div');
+      card.className = 'result-card';
+
+      const row = document.createElement('div');
+      row.className = 'lang-row';
+      const code = document.createElement('span');
+      code.className = 'lang-code';
+      code.textContent = o.lang || lang;
+      const dl = document.createElement('a');
+      dl.className = 'download';
+      dl.href = o.result_url;
+      dl.setAttribute('download', '');
+      dl.textContent = '다운로드';
+      row.appendChild(code);
+      row.appendChild(dl);
+
+      const audio = document.createElement('audio');
+      audio.controls = true;
+      audio.src = o.result_url;
+
+      card.appendChild(row);
+      card.appendChild(audio);
+      resultCards.appendChild(card);
+    }
+  }
+
+  function renderLangChips(langs) {
+    if (!langs || langs.length === 0) { progressLangs.innerHTML = ''; return; }
+    progressLangs.innerHTML = '타깃 언어: ' +
+      langs.map((l) => '<span class="chip">' + escapeHtml(l) + '</span>').join('');
+  }
+
+  // ---------------------------------------------------------------------------
+  // Helpers
+  // ---------------------------------------------------------------------------
+  function showView(name) {
+    viewIdle.style.display = name === 'idle' ? '' : 'none';
+    viewProgress.style.display = name === 'progress' ? '' : 'none';
+    viewResult.style.display = name === 'result' ? '' : 'none';
+    viewError.style.display = name === 'error' ? '' : 'none';
+  }
+
+  function showError(title, msg) {
+    showView('error');
+    errorTitle.textContent = title;
+    errorMsg.textContent = msg;
+  }
+
+  function detailToString(detail) {
+    if (detail == null) return '';
+    if (typeof detail === 'string') return detail;
+    if (Array.isArray(detail)) {
+      return detail.map((d) => (d && d.msg) ? d.msg : JSON.stringify(d)).join('; ');
+    }
+    if (typeof detail === 'object' && detail.msg) return detail.msg;
+    return JSON.stringify(detail);
+  }
+
+  function stageLabel(stage) {
+    const labels = {
+      ingesting: '소스 분석 중',
+      dubbing: '더빙 생성 중',
+      finalizing: '마무리 중',
+      transcribing: '자막 생성 중',
+    };
+    return labels[stage] || stage;
+  }
+
+  function startElapsedTimer() {
+    if (elapsedTimer) clearInterval(elapsedTimer);
+    const start = jobStartTime || Date.now();
+    const tick = () => {
+      const elapsed = Math.round((Date.now() - start) / 1000);
+      progressElapsed.textContent = '경과: ' + formatDuration(elapsed);
+    };
+    tick();
+    elapsedTimer = setInterval(tick, 1000);
+  }
+
+  function stopElapsedTimer() {
+    if (elapsedTimer) { clearInterval(elapsedTimer); elapsedTimer = null; }
+  }
+
+  function formatDuration(secs) {
+    secs = Math.round(secs);
+    if (secs < 60) return secs + '초';
+    const m = Math.floor(secs / 60);
+    const s = secs % 60;
+    if (m < 60) return s > 0 ? (m + '분 ' + s + '초') : (m + '분');
+    const h = Math.floor(m / 60);
+    const rm = m % 60;
+    return h + '시간 ' + rm + '분';
+  }
+
+  function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str == null ? '' : String(str);
+    return div.innerHTML;
+  }
+
+  // Initial state
+  updateSubmitState();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,41 @@
+# VCS
+.git
+.gitignore
+.gitmodules
+
+# Python caches / build artifacts
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Local lockfiles / editor
+uv.lock
+.vscode/
+.idea/
+
+# Runtime data / outputs (must not bloat build context)
+results/
+output_*.wav
+*.wav
+
+# Nested submodule git dirs and their caches
+external/**/.git
+external/**/__pycache__/
+external/**/*.egg-info/
+
+# chalna submodule is built separately (its own service / build context)
+external/chalna
+
+# Docs build artifacts
+docs/_build/

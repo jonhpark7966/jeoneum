@@ -63,6 +63,158 @@
 | **aligner** | 세그먼트 클립 → 타임라인 정렬 | 내부 모듈 |
 | **mixer** | 더빙 트랙 + 배경음 ducking 믹스 | 내부 모듈 |
 
+---
+
+## 사용법 / Usage
+
+세 가지 인터페이스를 제공합니다: **CLI**, **REST API**, **WebUI**. 자세한 안내는 [`docs/usage.md`](docs/usage.md) 참조.
+
+> jeoneum은 전사·번역을 직접 하지 않습니다. **chalna 서비스가 반드시 기동 중이어야** 하며(`CHALNA_URL`, 기본 `http://localhost:7861`), `/translate`를 제공해야 합니다. TTS는 GPU에서 Qwen3-TTS를 사용하므로 **GPU가 필요**하고, 모델 가중치는 첫 요청 시 HuggingFace에서 자동 다운로드됩니다.
+
+### CLI
+
+#### `jeoneum dub` — 더빙 실행
+
+```bash
+jeoneum dub <source> --to en,ja \
+  [-o out] \
+  [--voice 0=ref.wav] \
+  [--keep-background | --replace-audio] \
+  [--duck | --no-duck] [--duck-db -12.0] \
+  [--subs-translated] \
+  [--max-speedup 1.3]
+```
+
+| 인자/플래그 | 기본값 | 설명 |
+|------------|--------|------|
+| `<source>` | (필수) | 입력 소스 — 로컬 영상/오디오 파일, YouTube/HTTP URL, 또는 기존 자막(`.srt`/`.json`, 원어 또는 번역본). |
+| `--to` | (필수) | 타깃 언어. 쉼표 구분, 예: `en,ja`. |
+| `--out`, `-o` | `out` | 출력 디렉터리. 결과는 `<out>/dub_<lang>.wav`. |
+| `--voice` | (없음) | 수동 화자 보이스, `speaker=ref.wav` 형식. 반복 지정 가능. ref 대본은 `ref.txt` 사이드카로 자동 로드됨. |
+| `--keep-background` / `--replace-audio` | `--keep-background` | 원본 배경음(BGM/SFX) 보존 여부. `--replace-audio`면 더빙 음성만 출력. |
+| `--duck` / `--no-duck` | `--no-duck` | 음성 구간에서 배경음 더킹(감쇠) 여부. 기본 OFF. |
+| `--duck-db` | `-12.0` | 더킹 시 배경음 감쇠량(dB). |
+| `--subs-translated` | `false` | 입력 자막이 이미 타깃 언어로 번역되어 있음(번역 단계 건너뜀). |
+| `--max-speedup` | `1.3` | 타이밍 정렬 시 허용 최대 압축(속도) 배율. |
+
+출력은 언어별로 한 줄씩 `[lang] path` 형식으로 표준출력에 표시됩니다:
+
+```
+[en] out/dub_en.wav
+[ja] out/dub_ja.wav
+```
+
+예시:
+
+```bash
+# 로컬 영상 → 영어 + 일본어, 배경음 보존
+jeoneum dub video.mp4 --to en,ja
+
+# YouTube URL → 영어, 수동 보이스 지정
+jeoneum dub "https://youtu.be/XXXX" --to en --voice 0=me.wav
+
+# 이미 번역된 SRT → 영어 더빙(번역 생략)
+jeoneum dub subs.en.srt --to en --subs-translated --voice 0=me.wav
+```
+
+#### `jeoneum serve` — REST API + WebUI 기동
+
+```bash
+jeoneum serve [--host 0.0.0.0] [--port 7870]
+```
+
+`http://localhost:7870/` 에서 WebUI, `/docs` 에서 자동 생성 API 문서를 제공합니다. (기본 호스트 `0.0.0.0`, 포트 `7870`.)
+
+### REST API
+
+작업은 비동기입니다: `POST /dub`로 잡을 생성하고 `GET /jobs/{id}`를 폴링하여 상태를 확인한 뒤, 완료되면 `GET /jobs/{id}/result/{lang}`로 wav를 내려받습니다. 상태 값: `queued → running → done | error`.
+
+| 메서드 | 경로 | 설명 |
+|--------|------|------|
+| `GET` | `/health` | 헬스체크. `{status, version, engine_loaded, gpu}`. 엔진을 로드하지 않으므로 즉시 응답. |
+| `POST` | `/dub` | 더빙 잡 생성 (`multipart/form-data`). `{job_id, status, target_languages}` 반환. |
+| `GET` | `/jobs/{job_id}` | 잡 상태/결과 조회 (JSON). |
+| `GET` | `/jobs/{job_id}/result/{lang}` | 완료된 언어의 wav 다운로드 (`audio/wav`). |
+| `GET` | `/` | WebUI (자체 완결형 HTML). |
+
+**`POST /dub` multipart 필드**
+
+| 필드 | 타입 | 필수 | 기본 | 설명 |
+|------|------|------|------|------|
+| `file` | 파일 | file/url 중 하나 | — | 소스 영상/오디오/.srt/.json 업로드. |
+| `url` | 문자열 | file/url 중 하나 | `null` | YouTube/HTTP URL. `file`이 없을 때만 사용. |
+| `target_languages` | 문자열 | 예 | — | CSV, 예: `en,ja`. 비어 있으면 400. |
+| `voice_sample` | 파일 | 아니오 | `null` | 단일 참조 보이스. **모든 화자**에 적용. |
+| `ref_text` | 문자열 | 아니오 | `null` | `voice_sample` 대본(클론 품질 향상). `voice_sample` 없으면 무시. |
+| `keep_background` | bool | 아니오 | `true` | 배경음 보존. |
+| `duck` | bool | 아니오 | `false` | 배경음 더킹. |
+| `duck_db` | float | 아니오 | `-12.0` | 더킹 감쇠(dB). |
+| `subs_translated` | bool | 아니오 | `false` | 입력 자막이 이미 번역됨. |
+| `max_speedup` | float | 아니오 | `1.3` | 최대 압축 배율. |
+
+curl 예시:
+
+```bash
+# 잡 생성
+curl -F file=@video.mp4 \
+     -F target_languages=en,ja \
+     -F voice_sample=@me.wav \
+     -F keep_background=true \
+     http://localhost:7870/dub
+# -> {"job_id":"...","status":"queued","target_languages":["en","ja"]}
+
+# 상태 폴링
+curl http://localhost:7870/jobs/<id>
+
+# 결과 다운로드
+curl -o dub_en.wav http://localhost:7870/jobs/<id>/result/en
+```
+
+`GET /jobs/{id}` 완료 응답 예:
+
+```json
+{
+  "job_id": "uuid4",
+  "status": "done",
+  "created_at": "2026-06-01T12:00:00.000000",
+  "started_at": "2026-06-01T12:00:01.000000",
+  "completed_at": "2026-06-01T12:03:00.000000",
+  "target_languages": ["en", "ja"],
+  "stage": null,
+  "source_name": "video.mp4",
+  "error": null,
+  "outputs": {
+    "en": { "lang": "en", "result_url": "/jobs/<id>/result/en", "filename": "dub_en.wav" },
+    "ja": { "lang": "ja", "result_url": "/jobs/<id>/result/ja", "filename": "dub_ja.wav" }
+  }
+}
+```
+
+### WebUI
+
+`jeoneum serve` 후 브라우저에서 `http://localhost:7870/` 접속. 자체 완결형 단일 페이지로, 외부 의존성이 없습니다.
+
+1. 좌측 **입력** 패널에서 소스 파일을 업로드하거나 YouTube/URL을 붙여넣습니다(둘은 상호 배타적).
+2. 타깃 언어(쉼표 구분, 기본 `en`)를 입력합니다.
+3. (선택) 화자 보이스 샘플과 그 대본을 지정합니다 — 모든 화자에 적용됩니다.
+4. 옵션(배경음 보존/더킹/감쇠 dB/자막 번역됨/최대 압축 배율)을 설정합니다.
+5. **더빙 시작**을 누르면 우측 **결과** 패널에서 진행 상황을 보여줍니다. UI는 `/jobs/{id}`를 **2초마다 폴링**합니다.
+6. 완료되면 언어별 카드에서 바로 재생하거나 다운로드할 수 있습니다.
+
+### Docker 서빙
+
+```bash
+docker compose up --build
+```
+
+`jeoneum`(:7870, GPU 필요)과 `chalna`(:7861)를 함께 띄웁니다. jeoneum은 `CHALNA_URL=http://chalna:7861`로 chalna에 접근합니다.
+
+- **GPU 필수.** 첫 `/dub` 요청은 Qwen3-TTS 가중치를 HuggingFace에서 내려받고 엔진을 로드하므로 느립니다(가중치는 `jeoneum-models` 볼륨에 캐시되어 재시작 후에도 유지).
+- 결과는 `./results`(컨테이너 내 `/data/results`, `JEONEUM_RESULTS_DIR`)에 저장됩니다.
+- **chalna는 별도 설정(codex 인증 등)이 필요**합니다 — `external/chalna` 참조. chalna가 기동·도달 가능하지 않으면 더빙 잡은 실패합니다.
+
+---
+
 ## License
 
 [PolyForm Noncommercial License 1.0.0](LICENSE.md).

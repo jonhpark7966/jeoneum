@@ -14,6 +14,20 @@ from .base import SynthItem, TTSEngine, VoiceHandle
 
 DEFAULT_MODEL = "Qwen/Qwen3-TTS-12Hz-1.7B-Base"
 
+# Qwen3-TTS expects language NAMES (e.g. "English"), not ISO codes ("en").
+_LANG_NAMES = {
+    "en": "English", "ko": "Korean", "ja": "Japanese", "zh": "Chinese",
+    "de": "German", "fr": "French", "ru": "Russian", "pt": "Portuguese",
+    "es": "Spanish", "it": "Italian",
+}
+
+
+def _normalize_language(language: str) -> str:
+    """Map an ISO code to a Qwen3 language name; pass through names unchanged."""
+    if not language:
+        return "Auto"
+    return _LANG_NAMES.get(language.strip().lower(), language)
+
 
 class Qwen3Engine(TTSEngine):
     def __init__(self, model: str = DEFAULT_MODEL, device: str = "cuda:0", dtype: str = "bfloat16"):
@@ -41,7 +55,7 @@ class Qwen3Engine(TTSEngine):
             return []
         wavs, sr = self._model.generate_voice_clone(
             text=[it.text for it in items],
-            language=[it.language for it in items],
+            language=[_normalize_language(it.language) for it in items],
             voice_clone_prompt=[it.voice.payload for it in items],
         )
         return [(np.asarray(w, dtype=np.float32), sr) for w in wavs]

@@ -16,10 +16,17 @@ services:
 
   jeoneum:
     build: .
+    # NOTE: GPU required. The first /dub is slow: it downloads Qwen3-TTS weights
+    # from HuggingFace (cached in the jeoneum-models volume) and loads the engine.
     depends_on:
       - chalna
     environment:
       CHALNA_URL: "http://chalna:7861"
+      JEONEUM_RESULTS_DIR: "/data/results"
+      HF_HOME: "/models/huggingface"
+    volumes:
+      - ./results:/data/results
+      - jeoneum-models:/models
     ports:
       - "7870:7870"
     deploy:
@@ -27,3 +34,7 @@ services:
         reservations:
           devices:
             - { driver: nvidia, count: all, capabilities: [gpu] }
+
+volumes:
+  # HF weights persist across restarts so they are not re-downloaded.
+  jeoneum-models:
