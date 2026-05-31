@@ -28,3 +28,6 @@ models/
 
 # Env
 .env
+
+# Task output dirs (generated dub artifacts)
+out_*/
