@@ -113,7 +113,26 @@ class ChalnaClient:
             segments=segments,
         )
 
-    def translate(self, doc: Doc, target_languages: list[str]) -> Doc:
-        # Hard dependency on chalna (no jeoneum fallback). chalna has no /translate
-        # endpoint yet — this is the chalna-side TODO (spec §11.4).
-        raise NotImplementedError("chalna /translate not implemented yet (chalna-side TODO)")
+    def translate(self, doc: Doc, target_languages: list[str], timeout: float = 600.0) -> Doc:
+        """Translate every segment into each target language via chalna /translate.
+
+        Hard dependency on chalna (no jeoneum fallback). Fills segment.text_target[lang].
+        """
+        segments = [{"index": s.index, "text": s.text} for s in doc.segments]
+        by_index = {s.index: s for s in doc.segments}
+        for lang in target_languages:
+            r = httpx.post(
+                f"{self.base_url}/translate",
+                json={
+                    "segments": segments,
+                    "target_language": lang,
+                    "source_language": doc.source.language,
+                },
+                timeout=timeout,
+            )
+            r.raise_for_status()
+            for t in r.json().get("translations", []):
+                seg = by_index.get(t["index"])
+                if seg is not None:
+                    seg.text_target[lang] = t["text"]
+        return doc

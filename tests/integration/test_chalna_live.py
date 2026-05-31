@@ -38,14 +38,29 @@ def test_doctor_reports_setup(client):
     assert {"codex", "ffmpeg", "gpu"} <= names
 
 
-@pytest.mark.parametrize("clip", ["voice_2spk.wav", "voice_1spk.wav"])
-def test_transcribe_returns_doc(client, clip):
+# min_covered guards the early-EOS coverage fix: transcription must reach near the
+# end of the clip (clips are ~17.1s and ~31.3s), not stop ~halfway.
+@pytest.mark.parametrize("clip,min_covered", [("voice_2spk.wav", 15.0), ("voice_1spk.wav", 28.0)])
+def test_transcribe_returns_doc(client, clip, min_covered):
     path = ASSETS / clip
     if not path.exists():
         pytest.skip(f"missing test clip {path}")
     doc = client.transcribe(str(path), use_llm_refinement=False)
     assert len(doc.segments) >= 1
-    assert doc.source.duration and doc.source.duration > 0
     assert all(s.speaker_id for s in doc.segments)
-    # segments are time-ordered and non-degenerate
     assert all(s.end_time >= s.start_time for s in doc.segments)
+    assert doc.source.duration and doc.source.duration >= min_covered
+
+
+def test_translate_fills_target(client):
+    from jeoneum.schema import Doc, Segment, Source
+
+    doc = Doc(
+        source=Source(media="x", language="Korean"),
+        segments=[
+            Segment(index=1, start_time=0.0, end_time=1.0, speaker_id="0", text="안녕하세요"),
+            Segment(index=2, start_time=1.0, end_time=2.0, speaker_id="0", text="감사합니다"),
+        ],
+    )
+    doc = client.translate(doc, ["English"])
+    assert all(s.text_target.get("English") for s in doc.segments)
