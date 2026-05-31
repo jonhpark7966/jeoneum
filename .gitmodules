@@ -1,0 +1,6 @@
+[submodule "external/Qwen3-TTS"]
+	path = external/Qwen3-TTS
+	url = https://github.com/QwenLM/Qwen3-TTS.git
+[submodule "external/chalna"]
+	path = external/chalna
+	url = git@github.com:jonhpark7966/chalna.git

@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+build/
+dist/
+
+# Tooling caches
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Runtime outputs / artifacts
+results/
+output/
+out/
+*.wav
+*.mp3
+*.mp4
+!assets/**
+
+# Models / large data
+pretrained_models/
+models/
+
+# Env
+.env

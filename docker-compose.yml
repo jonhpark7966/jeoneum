@@ -1,0 +1,29 @@
+# jeoneum + chalna services. DRAFT — see docs/spec.md §9.
+# jeoneum holds the GPU (Qwen3-TTS in-process + audio-separator); it calls
+# chalna over REST and brings chalna up if it is not already running.
+services:
+  chalna:
+    build: ./external/chalna
+    # image: chalna:local
+    ports:
+      - "7861:7861"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - { driver: nvidia, count: all, capabilities: [gpu] }
+    # chalna serves API + WebUI on :7861 (see external/chalna/README.md)
+
+  jeoneum:
+    build: .
+    depends_on:
+      - chalna
+    environment:
+      CHALNA_URL: "http://chalna:7861"
+    ports:
+      - "7870:7870"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - { driver: nvidia, count: all, capabilities: [gpu] }

@@ -1,0 +1,48 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "jeoneum"
+version = "0.0.1"
+description = "전음(傳音) — speaker-preserving multilingual video/audio dubbing pipeline"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "PolyForm-Noncommercial-1.0.0" }
+authors = [{ name = "Jong Hyun Park" }]
+
+# Orchestration deps. Heavy GPU deps live in extras / submodules:
+#   - TTS engine: `pip install -e external/Qwen3-TTS`  (qwen-tts, in-process)
+#   - source separation: `pip install ".[gpu]"`        (audio-separator)
+dependencies = [
+  "typer>=0.12",
+  "fastapi>=0.110",
+  "uvicorn[standard]>=0.29",
+  "python-multipart>=0.0.9",
+  "pydantic>=2.6",
+  "httpx>=0.27",
+  "numpy",
+  "soundfile",
+  "librosa",
+  "yt-dlp",
+]
+
+[project.optional-dependencies]
+gpu = ["audio-separator[gpu]"]
+cpu = ["audio-separator[cpu]"]
+dev = ["pytest>=8.0", "pytest-cov", "ruff"]
+
+[project.scripts]
+jeoneum = "jeoneum.cli:app"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/jeoneum"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+markers = [
+  "gpu: requires a CUDA GPU + real models (run locally; skipped without GPU)",
+  "integration: requires external services (e.g. live chalna container)",
+]
+# Default CI run excludes heavy suites:  pytest -m 'not gpu and not integration'
