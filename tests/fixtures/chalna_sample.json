@@ -1,0 +1,11 @@
+{
+  "job_id": "test-0001",
+  "status": "completed",
+  "result": {
+    "segments": [
+      {"index": 1, "start_time": 0.5, "end_time": 2.0, "text": "안녕하세요 여러분", "speaker_id": "0", "confidence": 1.0},
+      {"index": 2, "start_time": 2.2, "end_time": 3.5, "text": "오늘은 더빙 테스트입니다", "speaker_id": "0", "confidence": 1.0},
+      {"index": 3, "start_time": 4.0, "end_time": 5.2, "text": "네 시작하죠", "speaker_id": "1", "confidence": 1.0}
+    ]
+  }
+}
