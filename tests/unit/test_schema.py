@@ -23,7 +23,11 @@ def test_doc_roundtrip_preserves_per_language_fields():
 
 
 def test_build_doc_from_chalna_response(chalna_response):
-    """The recorded chalna fixture maps cleanly onto segment-level fields."""
-    segs = [Segment(**s) for s in chalna_response["result"]["segments"]]
-    assert [s.speaker_id for s in segs] == ["0", "0", "1"]
-    assert segs[0].text_target == {}                 # not yet translated
+    """A recorded chalna /transcribe response maps cleanly onto a Doc."""
+    from jeoneum.chalna_client import ChalnaClient
+
+    doc = ChalnaClient._to_doc("in.wav", chalna_response)
+    assert len(doc.segments) == len(chalna_response["segments"])
+    assert doc.source.duration == chalna_response["metadata"]["duration"]
+    assert {s.speaker_id for s in doc.segments} == set(chalna_response["metadata"]["speakers"])
+    assert doc.segments[0].text_target == {}         # not yet translated

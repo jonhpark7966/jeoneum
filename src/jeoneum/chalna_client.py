@@ -12,10 +12,11 @@ from __future__ import annotations
 import os
 import subprocess
 import time
+from pathlib import Path
 
 import httpx
 
-from .schema import Doc
+from .schema import Doc, Segment, Source
 
 
 class ChalnaClient:
@@ -57,9 +58,62 @@ class ChalnaClient:
             time.sleep(2.0)
         raise RuntimeError(f"chalna did not become healthy at {self.base_url}")
 
+    # -- diagnostics ---------------------------------------------------------
+    def doctor(self) -> dict:
+        """Return chalna's /doctor report (setup checks: codex, ffmpeg, gpu, ...)."""
+        r = httpx.get(f"{self.base_url}/doctor", timeout=15.0)
+        r.raise_for_status()
+        return r.json()
+
     # -- stages --------------------------------------------------------------
-    def transcribe(self, wav_path: str, **opts) -> Doc:
-        raise NotImplementedError("wire to chalna /transcribe; map segments -> Doc")
+    def transcribe(
+        self,
+        audio_path: str,
+        *,
+        language: str | None = None,
+        context: str | None = None,
+        include_speaker: bool = True,
+        use_alignment: bool = True,
+        use_llm_refinement: bool = True,
+        timeout: float = 1200.0,
+    ) -> Doc:
+        """Transcribe + diarize via chalna /transcribe (json). Maps to a Doc."""
+        data = {
+            "output_format": "json",
+            "include_speaker": str(include_speaker).lower(),
+            "use_alignment": str(use_alignment).lower(),
+            "use_llm_refinement": str(use_llm_refinement).lower(),
+        }
+        if language:
+            data["language"] = language
+        if context:
+            data["context"] = context
+        with open(audio_path, "rb") as fh:
+            files = {"file": (Path(audio_path).name, fh)}
+            r = httpx.post(f"{self.base_url}/transcribe", data=data, files=files, timeout=timeout)
+        r.raise_for_status()
+        return self._to_doc(audio_path, r.json())
+
+    @staticmethod
+    def _to_doc(audio_path: str, payload: dict) -> Doc:
+        meta = payload.get("metadata", {})
+        segments = [
+            Segment(
+                index=s["index"],
+                start_time=s["start_time"],
+                end_time=s["end_time"],
+                speaker_id=str(s.get("speaker_id", "0")),
+                text=s["text"],
+                confidence=s.get("confidence"),
+            )
+            for s in payload.get("segments", [])
+        ]
+        return Doc(
+            source=Source(media=audio_path, language=meta.get("language"), duration=meta.get("duration")),
+            segments=segments,
+        )
 
     def translate(self, doc: Doc, target_languages: list[str]) -> Doc:
-        raise NotImplementedError("wire to chalna translate endpoint (chalna-side TODO)")
+        # Hard dependency on chalna (no jeoneum fallback). chalna has no /translate
+        # endpoint yet — this is the chalna-side TODO (spec §11.4).
+        raise NotImplementedError("chalna /translate not implemented yet (chalna-side TODO)")
