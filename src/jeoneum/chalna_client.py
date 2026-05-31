@@ -65,9 +65,10 @@ class ChalnaClient:
         r.raise_for_status()
         return r.json()
 
-    def _post_retry(self, url: str, *, retries: int = 4, base_delay: float = 8.0, **kwargs):
-        """POST with retry+backoff on 503 (chalna returns 503 on transient GPU
-        contention/OOM, e.g. when another client holds the GPU) and on connection errors."""
+    def _post_retry(self, url: str, *, retries: int = 8, base_delay: float = 10.0, **kwargs):
+        """POST with retry+backoff on 503 (chalna returns 503 when busy — it is a
+        shared GPU service, so another client's job makes it reject new requests)
+        and on connection errors. Patient by default to wait out a busy window."""
         last_err = None
         for attempt in range(retries + 1):
             try:
