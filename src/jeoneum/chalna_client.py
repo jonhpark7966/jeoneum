@@ -65,6 +65,26 @@ class ChalnaClient:
         r.raise_for_status()
         return r.json()
 
+    def _post_retry(self, url: str, *, retries: int = 4, base_delay: float = 8.0, **kwargs):
+        """POST with retry+backoff on 503 (chalna returns 503 on transient GPU
+        contention/OOM, e.g. when another client holds the GPU) and on connection errors."""
+        last_err = None
+        for attempt in range(retries + 1):
+            try:
+                r = httpx.post(url, **kwargs)
+            except httpx.HTTPError as e:
+                last_err = e
+                if attempt < retries:
+                    time.sleep(base_delay * (attempt + 1))
+                    continue
+                raise
+            if r.status_code == 503 and attempt < retries:
+                time.sleep(base_delay * (attempt + 1))
+                continue
+            r.raise_for_status()
+            return r
+        raise last_err
+
     # -- stages --------------------------------------------------------------
     def transcribe(
         self,
@@ -88,10 +108,9 @@ class ChalnaClient:
             data["language"] = language
         if context:
             data["context"] = context
-        with open(audio_path, "rb") as fh:
-            files = {"file": (Path(audio_path).name, fh)}
-            r = httpx.post(f"{self.base_url}/transcribe", data=data, files=files, timeout=timeout)
-        r.raise_for_status()
+        # Read bytes (not a file handle) so the request can be resent on retry.
+        files = {"file": (Path(audio_path).name, Path(audio_path).read_bytes())}
+        r = self._post_retry(f"{self.base_url}/transcribe", data=data, files=files, timeout=timeout)
         return self._to_doc(audio_path, r.json())
 
     @staticmethod
@@ -121,7 +140,7 @@ class ChalnaClient:
         segments = [{"index": s.index, "text": s.text} for s in doc.segments]
         by_index = {s.index: s for s in doc.segments}
         for lang in target_languages:
-            r = httpx.post(
+            r = self._post_retry(
                 f"{self.base_url}/translate",
                 json={
                     "segments": segments,
@@ -130,7 +149,6 @@ class ChalnaClient:
                 },
                 timeout=timeout,
             )
-            r.raise_for_status()
             for t in r.json().get("translations", []):
                 seg = by_index.get(t["index"])
                 if seg is not None:
