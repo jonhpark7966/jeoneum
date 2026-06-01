@@ -8,8 +8,9 @@ stays intelligible. A more refined sidechain compressor is a later refinement
 """
 from __future__ import annotations
 
-import librosa
 import numpy as np
+import soundfile as sf
+import soxr
 
 
 def _voice_envelope(voice: np.ndarray, sr: int, win_ms: float = 50.0) -> np.ndarray:
@@ -35,7 +36,12 @@ def mix(
     if not background_path:
         return voice                                 # full-replacement fallback
 
-    bg, _ = librosa.load(background_path, sr=sr, mono=True)
+    bg, file_sr = sf.read(background_path, dtype="float32", always_2d=False)
+    if bg.ndim > 1:
+        bg = bg.mean(axis=1)
+    if file_sr != sr:
+        bg = soxr.resample(bg, file_sr, sr).astype(np.float32)
+    bg = bg.astype(np.float32)
     # Anchor to the FULL timeline: keep the longer of the two so trailing
     # background (outro/music after the last spoken segment) is preserved.
     n = max(len(voice), len(bg))

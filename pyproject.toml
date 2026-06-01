@@ -23,9 +23,8 @@ dependencies = [
   "httpx>=0.27",
   "numpy",
   "soundfile",
-  "librosa",
-  "audiotsm",        # WSOLA time-stretch (better than librosa phase vocoder for speech)
-  "pyrubberband",    # uses the rubberband CLI if installed (best quality); optional
+  "soxr",            # resampling (background -> output sample rate)
+  "audiotsm",        # WSOLA time-stretch (transient-preserving; for timing alignment)
   "yt-dlp",
 ]
 

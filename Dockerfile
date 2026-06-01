@@ -15,7 +15,6 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends \
       python3 python3-pip python3-venv \
       build-essential ca-certificates curl ffmpeg git libsndfile1 \
-      rubberband-cli \
     && ln -sf /usr/bin/python3 /usr/bin/python \
     && rm -rf /var/lib/apt/lists/*
 
