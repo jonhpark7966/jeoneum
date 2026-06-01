@@ -24,6 +24,8 @@ dependencies = [
   "numpy",
   "soundfile",
   "librosa",
+  "audiotsm",        # WSOLA time-stretch (better than librosa phase vocoder for speech)
+  "pyrubberband",    # uses the rubberband CLI if installed (best quality); optional
   "yt-dlp",
 ]
 

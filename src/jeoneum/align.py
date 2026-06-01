@@ -10,10 +10,10 @@ Ported from the validated PoC: Qwen3-TTS/examples/dub_from_srt.py.
 """
 from __future__ import annotations
 
-import librosa
 import numpy as np
 
 from .schema import Segment
+from .timestretch import time_compress
 
 
 def fit_clip(wav: np.ndarray, sr: int, slot_sec: float, max_speedup: float) -> tuple[np.ndarray, bool]:
@@ -22,8 +22,8 @@ def fit_clip(wav: np.ndarray, sr: int, slot_sec: float, max_speedup: float) -> t
     if slot_sec <= 0 or clip_sec <= slot_sec:
         return wav, False
     needed = clip_sec / slot_sec               # >1 => must speed up
-    rate = min(needed, max_speedup)            # librosa: rate>1 -> faster/shorter
-    fitted = librosa.effects.time_stretch(wav.astype(np.float32), rate=rate)
+    rate = min(needed, max_speedup)            # rate>1 -> faster/shorter
+    fitted = time_compress(wav.astype(np.float32), sr, rate)
     return fitted, needed > max_speedup
 
 
