@@ -10,8 +10,10 @@ A reference clip may carry its transcript in a sidecar `.txt` of the same basena
 """
 from __future__ import annotations
 
-import subprocess
 from pathlib import Path
+
+import numpy as np
+import soundfile as sf
 
 from .schema import Doc, Voice
 from .tts.base import TTSEngine, VoiceHandle
@@ -28,26 +30,36 @@ def _resolve_ref_text(voice: Voice) -> str | None:
 
 
 def extract_ref(
-    audio_path: str, doc: Doc, speaker_id: str, workdir: str, max_sec: float = 10.0
+    audio_path: str, doc: Doc, speaker_id: str, workdir: str,
+    target_sec: float = 8.0, max_segments: int = 5,
 ) -> tuple[str, str | None]:
-    """Cut a reference clip for speaker_id from `audio_path` (the separated vocals
-    stem when available). Picks the speaker's longest segment as a clean-ish sample
-    and returns (ref_audio_path, ref_text). The ref text is the source-language
-    transcript of that segment — cross-lingual cloning handles the target language."""
-    segs = [s for s in doc.segments if s.speaker_id == speaker_id and s.end_time > s.start_time]
+    """Build a per-speaker reference clip from `audio_path` (the separated vocals
+    stem when available, else the original audio) by concatenating that speaker's
+    longest cues up to ~target_sec, with the matching transcript. Cross-lingual
+    cloning handles the target language. Returns (ref_audio_path, ref_text)."""
+    segs = [s for s in doc.segments if s.speaker_id == speaker_id and (s.end_time - s.start_time) > 0.4]
     if not segs:
-        raise ValueError(f"no segments to extract a reference for speaker {speaker_id!r}")
-    best = max(segs, key=lambda s: s.end_time - s.start_time)
-    start = best.start_time
-    duration = min(best.end_time - start, max_sec)
+        raise ValueError(f"no usable segments to extract a reference for speaker {speaker_id!r}")
+    segs.sort(key=lambda s: s.end_time - s.start_time, reverse=True)
+    chosen, total = [], 0.0
+    for s in segs:
+        chosen.append(s)
+        total += s.end_time - s.start_time
+        if total >= target_sec or len(chosen) >= max_segments:
+            break
+    chosen.sort(key=lambda s: s.start_time)   # natural order for the concatenated clip
+
+    audio, sr = sf.read(audio_path)
+    if audio.ndim > 1:
+        audio = audio.mean(axis=1)
+    audio = audio.astype(np.float32)
+    clips = [audio[int(s.start_time * sr): int(s.end_time * sr)] for s in chosen]
+    ref = np.concatenate([c for c in clips if len(c)])
+
     Path(workdir).mkdir(parents=True, exist_ok=True)
     out = str(Path(workdir) / f"ref_{speaker_id}.wav")
-    subprocess.run(
-        ["ffmpeg", "-y", "-loglevel", "error", "-ss", str(start), "-i", audio_path,
-         "-t", str(duration), "-ac", "1", "-ar", "24000", out],
-        check=True,
-    )
-    return out, best.text
+    sf.write(out, ref, sr)
+    return out, " ".join(s.text for s in chosen)
 
 
 def resolve_voices(
