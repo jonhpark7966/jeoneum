@@ -133,25 +133,30 @@ class ChalnaClient:
             segments=segments,
         )
 
-    def translate(self, doc: Doc, target_languages: list[str], timeout: float = 600.0) -> Doc:
+    def translate(
+        self, doc: Doc, target_languages: list[str], timeout: float = 600.0, chunk_size: int = 40,
+    ) -> Doc:
         """Translate every segment into each target language via chalna /translate.
 
-        Hard dependency on chalna (no jeoneum fallback). Fills segment.text_target[lang].
+        Segments are sent in chunks (one codex call each) so long content doesn't
+        overflow the prompt / time out. Hard dependency on chalna (no fallback).
         """
         segments = [{"index": s.index, "text": s.text} for s in doc.segments]
         by_index = {s.index: s for s in doc.segments}
         for lang in target_languages:
-            r = self._post_retry(
-                f"{self.base_url}/translate",
-                json={
-                    "segments": segments,
-                    "target_language": lang,
-                    "source_language": doc.source.language,
-                },
-                timeout=timeout,
-            )
-            for t in r.json().get("translations", []):
-                seg = by_index.get(t["index"])
-                if seg is not None:
-                    seg.text_target[lang] = t["text"]
+            for i in range(0, len(segments), chunk_size):
+                chunk = segments[i : i + chunk_size]
+                r = self._post_retry(
+                    f"{self.base_url}/translate",
+                    json={
+                        "segments": chunk,
+                        "target_language": lang,
+                        "source_language": doc.source.language,
+                    },
+                    timeout=timeout,
+                )
+                for t in r.json().get("translations", []):
+                    seg = by_index.get(t["index"])
+                    if seg is not None:
+                        seg.text_target[lang] = t["text"]
         return doc
