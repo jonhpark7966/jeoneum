@@ -12,6 +12,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import numpy as np
 import soundfile as sf
 
 from . import align, ingest, mix, subtitles
@@ -85,6 +86,10 @@ def dub(
         doc = chalna.transcribe(wav)
         doc.target_languages = target_languages
         doc.audio_path = wav   # fallback source for auto per-speaker ref extraction
+        # Anchor to the ACTUAL media length: chalna's metadata.duration is only the
+        # transcribed span (last cue end), which is usually shorter than the file.
+        info = sf.info(wav)
+        doc.source.duration = info.frames / info.samplerate
 
         # Separation is only needed to preserve the background. When kept, the clean
         # vocals stem is also used for per-speaker ref extraction; otherwise refs are
@@ -136,6 +141,12 @@ def dub(
             seg.overran[lang] = m["overran"]
         _p(f"mixing:{lang}")
         final = mix.mix(track, sr, doc.background_audio if keep_background else None, duck=duck, duck_db=duck_db)
+
+        # Make the dubbed audio EXACTLY the source duration (pad with silence / trim).
+        target_len = int(round((doc.source.duration or 0.0) * sr))
+        if target_len > 0:
+            final = (np.pad(final, (0, target_len - len(final))) if len(final) < target_len
+                     else final[:target_len])
 
         out_path = str(work / f"dub_{lang}.wav")
         sf.write(out_path, final, sr)
