@@ -18,6 +18,19 @@
 
 핵심 병목은 **TTS 엔진의 크로스링구얼 클론 품질**입니다. **더 나은 TTS 엔진이 나오면 재개**할 의향이 있습니다.
 
+### TTS 엔진 조사 메모 (2026-06-02)
+
+"중국어 억양 영어"는 **Qwen3-TTS의 알려진/보고된 한계**이며 사실상 현 구조로는 회피하기 어렵습니다.
+
+- 공식 레포에 동일 증상 이슈가 **"not planned"로 닫혀** 있음([#134](https://github.com/QwenLM/Qwen3-TTS/issues/134)), 더빙용 크로스링구얼 FT 논의도 미응답([#288](https://github.com/QwenLM/Qwen3-TTS/discussions/288)).
+- **원인**: 학습 데이터가 중국어에 치우쳐(방언 제어도 중국어 전용) 불확실할 때 억양이 중국어로 쏠리고, 기본 Full-ICL 모드는 억양/음색이 분리되지 않아 **레퍼런스 언어(한국어) 음운이 영어 출력에 새어나옴**. 억양은 제어 파라미터에 없음. `qwen3-tts-flash` 최신 버전도 이 부분은 개선하지 않음.
+- 단, 이는 Qwen 고유가 아니라 **제로샷 크로스링구얼 클론 전반의 공통 문제**(ElevenLabs·F5-TTS·XTTS-v2도 동일 누수 보고).
+
+**재개 시 방향 (TTS)**
+1. **타깃어(영어) 네이티브 레퍼런스 사용** — 본인 음색 보존이 필수가 아니라면 가장 확실한 해법.
+2. 본인 음색 유지가 필요하면 **엔진 교체**: 1순위 [Chatterbox Multilingual](https://huggingface.co/ResembleAI/chatterbox)(MIT, 23개 언어, cross-language transfer 설계), 차순위 [CosyVoice2](https://huggingface.co/FunAudioLLM/CosyVoice2-0.5B)(오픈, 크로스링구얼 제로샷), 상용 벤치마크 ElevenLabs Dubbing/PVC. → **엔진 교체가 사실상 재개의 전제**.
+3. Qwen 유지 시 무료 완화책: `language="English"` 명시 + `x_vector_only_mode=True`(억양 누수↓, 유사도 일부 손해), ref 클립 ≤10초. 그래도 부족하면 네이티브 영어 데이터로 파인튜닝.
+
 > 아래 문서에서 "동작함 / working / 검증 완료"는 **파이프라인이 기능적으로 완주함**을 의미하며 **출력 품질을 보증하지 않습니다.**
 
 ---
